@@ -1,0 +1,2598 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lunar Habitat Configurator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Three.js (Core) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load GLTFLoader for .glb models -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- Load PointerLockControls for 3D navigation -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <style>
+      /* Custom CSS for the 3D environment and UI */
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: "Inter", sans-serif;
+        background-color: #000;
+      }
+      canvas {
+        display: block;
+      }
+      #config-ui {
+        z-index: 1000;
+        transition: opacity 0.3s ease;
+      }
+      .detail-panel-transition {
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+      }
+      .page-transition {
+        transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+      }
+      .preview-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 0.375rem;
+      }
+      .preview-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .preview-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #6b7280;
+        font-size: 0.75rem;
+      }
+      /* New style for position display */
+      #position-display {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 100;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      /* Evaluation styles */
+      .score-bar {
+        height: 8px;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+      }
+      .score-excellent {
+        background: linear-gradient(90deg, #10b981, #34d399);
+      }
+      .score-good {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      }
+      .score-poor {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+      }
+      .warning-path {
+        stroke: #ef4444;
+        stroke-width: 3px;
+        stroke-dasharray: 5, 5;
+        animation: dash 1s linear infinite;
+      }
+      @keyframes dash {
+        to {
+          stroke-dashoffset: -10;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- START SCREEN (New addition to fix Pointer Lock errors) -->
+    <div
+      id="start-screen"
+      class="absolute inset-0 bg-gray-900/95 z-[2000] flex flex-col items-center justify-center p-8"
+    >
+      <h1 class="text-5xl font-extrabold text-white mb-6">
+        Enter Lunar Simulation
+      </h1>
+      <p class="text-lg text-gray-300 mb-8 text-center">
+        Click the button below to lock your cursor and begin exploration on the
+        Moon's surface.
+      </p>
+      <button
+        id="enter-3d"
+        class="px-10 py-4 bg-indigo-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition duration-200 transform hover:scale-105"
+      >
+        Start Mission
+      </button>
+    </div>
+
+    <!-- 2D Configuration UI Overlay -->
+    <div
+      id="config-ui"
+      class="absolute inset-0 bg-gray-900/95 backdrop-blur-md hidden flex items-center justify-center p-4 opacity-0"
+    >
+      <div
+        id="config-container"
+        class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-8 transform translate-y-10 page-transition"
+      >
+        <!-- Pages will be injected here -->
+      </div>
+    </div>
+
+    <!-- 3D Environment HUD/Interaction Prompts -->
+    <div
+      id="hud"
+      class="absolute top-0 left-0 w-full h-full pointer-events-none"
+    >
+      <div
+        id="crosshair"
+        class="absolute left-1/2 top-1/2 w-4 h-4 -ml-2 -mt-2 border-2 border-white rounded-full opacity-70"
+      ></div>
+      <div
+        id="interaction-prompt"
+        class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-white bg-blue-600 px-4 py-2 rounded-lg text-sm transition duration-300 opacity-0"
+      >
+        Press [E] to Interact
+      </div>
+      <div
+        id="controls-prompt"
+        class="absolute top-4 right-4 text-white p-3 bg-gray-800/80 rounded-lg text-xs opacity-70"
+      >
+        <h3 class="font-bold mt-2 mb-1">Movement Controls</h3>
+        <p>W/A/S/D: Move</p>
+        <p>Space/Shift: Fly Up/Down</p>
+        <h3 class="font-bold mt-2 mb-1">Object Controls (Selected)</h3>
+        <p>F: Select/Deselect</p>
+        <p>E: Interact with Panel</p>
+        <p>Arrows: X/Z Plane Move</p>
+        <p>O/P: Rotate (Y-Axis)</p>
+        <p>Q/R: Y-Axis Move (Up/Down)</p>
+      </div>
+    </div>
+    <div
+      id="selection-hint"
+      class="absolute top-20 left-1/2 transform -translate-x-1/2 text-white bg-yellow-600 px-4 py-2 rounded-lg text-sm transition duration-300 opacity-0 pointer-events-none"
+    >
+      Press [F] to select/Deselect nearby objects
+    </div>
+
+    <!-- Position Display Element -->
+    <div id="position-display" class="hidden">
+      Selected: <span id="selected-object-name">None</span><br />
+      Position: X:<span id="pos-x">0.00</span> Y:<span id="pos-y">0.00</span>
+      Z:<span id="pos-z">0.00</span><br />
+      Rotation: <span id="rot-y">0.00</span> rad
+    </div>
+
+    <script>
+      // --- CORE CONFIGURATION AND MODEL URLS (EDIT THIS SECTION) ---
+      const MODEL_URLS = {
+        // Placeholder URLs for GLB models. REPLACE these with your actual model paths.
+        HABITAT_1: "3d/Habitat Type 1 try 1 with window & door space .glb", // Example
+        HABITAT_2: "3d/Puzzle habitat try 1 finally the final one .glb", // Example
+        HABITAT_3: "3d/2ND H try 2 Smooth .glb", // Example
+
+        FURNITURE_1: "3d/crew quarters.glb", // Example
+        FURNITURE_2: "3d/habitat clynder.glb", // Example
+        FURNITURE_3: "3d/lab.glb", // Example
+        FURNITURE_4: "3d/hygiene.glb", // Example
+        FURNITURE_5: "3d/storage.glb", // Example
+        FURNITURE_6: "3d/airlock.glb", // Example
+        FURNITURE_7: "3d/save heaven.glb", // Example
+        FURNITURE_8: "3d/greenhouse.glb", // Example
+        FURNITURE_9: "3d/life support.glb",
+        FURNITURE_10: "3d/oxygen_farm_2.glb", // Example
+
+        // Add table and device URLs
+        TABLE: "3d/matte_black_pub_table.glb", // Table model
+        DEVICE: "3d/device_model.glb", // Device model - replace with your actual device model
+      };
+
+      const HABITAT_CONFIG = [
+        {
+          id: "HABITAT_1",
+          name: "Lunar Surface Base (Short-Term, 30 Days)",
+          url: MODEL_URLS.HABITAT_1,
+          description:
+            "Small habitat for 2-4 astronauts on the Moon. Compact, functional, and radiation-protected for short missions.",
+          details: `Exterior: <br>
+
+- Cylindrical habitat (Ø 6m x 8m) <br>
+- Airlock (Ø 2.5m x 3.5m) <br>
+- Light regolith shielding (~1.5m) <br>
+
+Interior & Modules: <br>
+
+- Crew Quarters: 2 private sleeping pods <br>
+- Hygiene Unit: Toilet and sink <br>
+- Galley/Dining Area: Meals and social space <br>
+- Storage/Work Area: Supplies and small workspace <br>
+- Airlock: Safe entry/exit to lunar surface <br>
+
+Benefits: <br>
+
+- Efficient use of limited space <br>
+- Ensures crew health and privacy <br>
+- Protects against lunar radiation`,
+          scale: { x: 5, y: 5, z: 5 }, // Habitat-specific scale
+          position: { x: 0, y: 25, z: -90 }, // Habitat-specific position
+          rotation: { y: -Math.PI }, // Habitat-specific Y-axis rotation (in radians)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: 0, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvRequired: 75, // m³ required for this habitat type
+          crewCapacity: 4,
+        },
+
+        {
+          id: "HABITAT_2",
+          name: "Mars Transit Habitat (Medium-Term, 6-9 Months)",
+          url: MODEL_URLS.HABITAT_2,
+          description:
+            "Medium-sized habitat for 6 astronauts during Mars transit. Pressurized, multi-functional, and internally shielded.",
+          details: `Exterior: <br>
+
+- Cylindrical core (Ø 8.4m x 12m) <br>
+- Docking ports (Ø 1.5m) <br>
+- Water walls and storage tanks for radiation protection <br>
+
+Interior & Modules: <br>
+
+- Crew Quarters: 6 private pods <br>
+- Galley/Dining Area: Meals, social hub <br>
+- Hygiene Unit: Full sanitation <br>
+- Lab/Work Module: Science, medical, maintenance <br>
+- Central Social/Exercise Zone: Open space for crew interaction <br>
+
+Benefits: <br>
+
+- Supports long-duration living <br>
+- Protects crew from space radiation <br>
+- Multi-functional for science, health, and leisure <br>
+            `,
+          scale: { x: 5, y: 5, z: 5 }, // Habitat-specific scale
+          position: { x: 0, y: 0, z: -90 }, // Habitat-specific position
+          rotation: { y: -1.37 }, // Habitat-specific Y-axis rotation (45 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvRequired: 120, // m³ required for this habitat type
+          crewCapacity: 6,
+        },
+        {
+          id: "HABITAT_3",
+          name: "Lunar Mars Surface Outpost (Long-Term, 500+ Days)",
+          url: MODEL_URLS.HABITAT_3,
+          description:
+            "A small, self-sufficient starter unit with Permanent Mars base for 6 astronauts. Expandable, shielded, self-sustaining with food production and social areas. power and life support systems. Low-profile design for minimal visual impact.",
+          details: `Exterior: <br>
+
+- Core module (Ø 6m x 8m) <br>
+- Inflatable dome (Ø 8.2m x 7m) <br>
+- Greenhouse (Ø 6m x 10m) <br>
+- Airlock (Ø 2.5m x 3.5m) <br>
+- Heavy regolith berm (~2.5-3 m) <br>
+
+Interior & Modules: <br>
+
+- Core: Life support, galley, hygiene unit <br>
+- Inflatable Dome: 6 crew quarters + social/exercise space <br>
+- Greenhouse: Hydroponic farming, food, oxygen <br>
+- Corridors: Connect modules <br>
+
+Benefits: <br>
+
+- Self-sustaining for long missions <br>
+- Provides food and oxygen regeneration <br>
+- Maximizes crew safety <br>
+- Enhances psychological well-being`,
+          scale: { x: 5, y: 5, z: 5 }, // Habitat-specific scale
+          position: { x: 0, y: 0.1, z: -90 }, // Habitat-specific position
+          rotation: { y: -1.57 }, // Habitat-specific Y-axis rotation (90 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvRequired: 180, // m³ required for this habitat type
+          crewCapacity: 6,
+        },
+      ];
+
+      const FURNITURE_CONFIG = [
+        {
+          id: "FURNITURE_1",
+          name: "Crew Quarters (Small or Large)",
+          url: MODEL_URLS.FURNITURE_1,
+          description:
+            "Private sleeping pod with space for a bed, personal storage, and small controls (lighting, ventilation)",
+          details: `
+            Benefits: <br>
+
+- Provides privacy and psychological relief — critical on long missions. <br>
+- Reduces conflicts by giving astronauts personal space. <br>
+- Helps regulate circadian rhythm (light and sound isolation). <br>
+- Each is sized for one astronaut. 
+          `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: -15.5, y: 25.1, z: -89 }, // Furniture-specific position
+          rotation: { y: 1.37 }, // Furniture-specific Y-axis rotation
+          previewScale: 0.5, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 12, // m³ per unit
+          providesPrivacy: true,
+          moduleType: "crew_quarters",
+        },
+        {
+          id: "FURNITURE_2",
+          name: "Habitat Cylinder (A or B — Common Module)",
+          url: MODEL_URLS.FURNITURE_2,
+          description:
+            "Shared living, eating, working, and social space. Can also include exercise equipment.",
+          details: ` Benefits: <br>
+        
+- Serves as the social hub — crew gather here for meals, meetings, recreation. <br>
+- Larger open volume reduces the feeling of confinement, improving mental health. <br>
+- Multi-functional: can hold galley, dining table, exercise gear, or command consoles. <br>
+- In emergencies, can be sealed and act as a safe-haven.`,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: 3, y: 25.1, z: -100.5 }, // Furniture-specific position
+          rotation: { y: -4.88 }, // Furniture-specific Y-axis rotation (30 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 25, // m³ per unit
+          providesCommunal: true,
+          moduleType: "common_area",
+        },
+        {
+          id: "FURNITURE_3",
+          name: "Lab / Work Module (Rectangular)",
+          url: MODEL_URLS.FURNITURE_3,
+          description:
+            "Dedicated science and engineering workspace with gloveboxes, instruments, or medical gear.",
+          details: `
+            Benefits: <br>
+
+- Supports scientific experiments (biology, geology, ISRU studies). <br>
+- Houses medical bay functions for emergencies. <br>
+- Keeps potentially hazardous work away from sleeping/social zones.<br>
+- Can double as a maintenance workshop for repairing equipment.<br>
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: -12.5, y: 12.1, z: -87 }, // Furniture-specific position
+          rotation: { y: 3.11 }, // Furniture-specific Y-axis rotation (60 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 18, // m³ per unit
+          moduleType: "work_area",
+        },
+        {
+          id: "FURNITURE_4",
+          name: "Hygiene Module (Compact or Full)",
+          url: MODEL_URLS.FURNITURE_4,
+          description:
+            "oilet, sink, hygiene station (full version may include shower/laundry).",
+          details: `
+            Benefits: <br>
+
+- Essential for sanitation and crew health. <br>
+- Reduces spread of bacteria and odor in confined space. <br>
+- A full module with recycling systems reduces water consumption on long missions. <br>
+- Placing it near airlocks helps with dust and contamination control on Moon/Mars. <br>
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: 11.5, y: 25.6, z: -81.5 }, // Furniture-specific position
+          rotation: { y: 2.72 }, // Furniture-specific Y-axis rotation (-30 degrees)
+          previewScale: 0.5, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 8, // m³ per unit
+          moduleType: "hygiene",
+          essentialLifeSupport: true,
+        },
+        {
+          id: "FURNITURE_5",
+          name: "Storage Module",
+          url: MODEL_URLS.FURNITURE_5,
+          description:
+            "Holds consumables (food, water, oxygen tanks), spare parts, and tools.",
+          details: `
+            Benefits: <br>
+
+- Provides organized logistics support. <br>
+- Acts as radiation shielding if placed strategically. <br>
+- Keeps clutter out of crew living areas, improving workflow. <br>
+- Can be used as ballast to balance modules.
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: -7, y: 38, z: -101.5 }, // Furniture-specific position
+          rotation: { y: -1.05 }, // Furniture-specific Y-axis rotation (-60 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 15, // m³ per unit
+          moduleType: "storage",
+        },
+        {
+          id: "FURNITURE_6",
+          name: "Airlock Module",
+          url: MODEL_URLS.FURNITURE_6,
+          description:
+            "Transition space for crew to don/doff suits and exit to the lunar/Martian surface or into space (for EVAs).",
+          details: ` Benefits:  <br>
+
+- Prevents depressurization of the whole habitat during EVAs. <br>
+- Allows safe crew entry/exit without contaminating living space. <br>
+- Can be adapted with suitports for dust control. <br>
+- Critical for safety and mission operations. <br>
+
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: -11, y: 38, z: -82 }, // Furniture-specific position
+          rotation: { y: 2.16 }, // Furniture-specific Y-axis rotation (180 degrees)
+          previewScale: 0.5, // Scale for preview
+          previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 6, // m³ per unit
+          moduleType: "airlock",
+        },
+        {
+          id: "FURNITURE_7",
+          name: "Safe-Haven Module",
+          url: MODEL_URLS.FURNITURE_7,
+          description:
+            "Special emergency shelter with independent life support, thicker shielding, and consumables for survival.",
+          details: `
+            Benefits: <br>
+
+- Protects crew from solar radiation storms or habitat depressurization. <br>
+- Sized so all crew can survive for at least 48-72 hours without outside help. <br>
+- Increases overall crew safety rating of the habitat. <br>
+- Judges will see it as critical for Mars outposts.
+
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: 5, y: 38, z: -82 }, // Furniture-specific position
+          rotation: { y: -4.06 }, // Furniture-specific Y-axis rotation (15 degrees)
+          previewScale: 0.3, // Scale for preview
+          previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 20, // m³ per unit
+          moduleType: "safe_haven",
+        },
+        {
+          id: "FURNITURE_8",
+          name: "Greenhouse Module",
+          url: MODEL_URLS.FURNITURE_8,
+          description:
+            "Plant growth chamber for food production, oxygen regeneration, and CO₂ absorption.Reinforced storage locker for geological samples and external tools. Pressurized and temperature-controlled.",
+          details: `
+            Benefits: <br>
+
+- Supplies fresh food (salads, vegetables), improving diet variety. <br>
+- Plants produce oxygen and absorb carbon dioxide, reducing life support load. <br>
+- Green spaces greatly improve psychological well-being (reduce stress, isolation). <br>
+- Long-term sustainability — vital for Mars outposts (less resupply needed).
+        `,
+          scale: { x: 4, y: 4, z: 4 }, // Furniture-specific scale
+          position: { x: 0.5, y: 12.5, z: -104 }, // Furniture-specific position
+          rotation: { y: 0.03 }, // Furniture-specific Y-axis rotation (-15 degrees)
+          previewScale: 1, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 30, // m³ per unit
+          moduleType: "greenhouse",
+          essentialLifeSupport: true,
+        },
+        {
+          id: "FURNITURE_9",
+          name: "Life Support Rack (LSS)",
+          url: MODEL_URLS.FURNITURE_9,
+          description:
+            "Houses Environmental Control and Life Support Systems (ECLSS): CO₂ scrubbers, O₂ generation, fans, pumps, filters, thermal control.",
+          details: `
+            
+
+Benefits: <br>
+
+- Provides air, water, and pressure regulation for the crew. <br>
+- Runs continuously — critical system for survival. <br>
+- Designed with redundancy (N+1) so if one pump fails, backup takes over. <br>
+- Without this, the habitat cannot sustain life — it's the heart of the habitat.
+            `,
+          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
+          position: { x: 13.5, y: 14, z: -82.5 }, // Furniture-specific position
+          rotation: { y: 1.11 }, // Furniture-specific Y-axis rotation (120 degrees)
+          previewScale: 0.5, // Scale for preview
+          previewPosition: { x: 0, y: 0, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 5, // m³ per unit
+          moduleType: "life_support",
+          essentialLifeSupport: true,
+        },
+
+        {
+          id: "FURNITURE_10",
+          name: "Oxygen Farm Module",
+          url: MODEL_URLS.FURNITURE_10,
+          description:
+            "Advanced plant growth chamber focused on maximizing oxygen production through high-efficiency hydroponics and algae bioreactors.",
+          details: `
+            Benefits: <br>
+            - Highly efficient oxygen production, crucial for crew survival. <br>
+            - Utilizes advanced hydroponics and algae cultivation techniques. <br>
+            - Reduces reliance on stored oxygen supplies, enhancing sustainability. <br>
+            - Contributes to a closed-loop life support system.
+            `,
+          scale: { x: 0.03, y: 0.03, z: 0.03 },
+          position: { x: 16, y: 12.1, z: -95.5 }, // Furniture-specific position
+          rotation: { y: -1.37 }, // Furniture-specific Y-axis rotation (-120
+          previewScale: 0.1, // Scale for preview
+          previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
+          // Evaluation properties
+          nhvProvided: 22, // m³ per unit
+          moduleType: "oxygen_farm",
+          essentialLifeSupport: true,
+        },
+      ];
+      // --- END CORE CONFIGURATION ---
+
+      // Global state for 3D environment
+      let scene, camera, renderer, controls;
+      let clock = new THREE.Clock();
+      const loader = new THREE.GLTFLoader();
+      let nearestObject = null;
+      const SELECTION_RANGE = 15; // Distance for object selection hint
+
+      // 3D Objects
+      let interactiveScreen, screenBoundingBox;
+      let table, tableBoundingBox;
+      let device, deviceBoundingBox;
+      let selectedObject = null;
+      let selectedObjectOutline = null;
+      const spawnedObjects = []; // Stores { mesh, config }
+
+      // Movement variables for PointerLockControls
+      let moveForward = false;
+      let moveBackward = false;
+      let moveLeft = false;
+      let moveRight = false;
+      let isJumping = false;
+      const velocity = new THREE.Vector3();
+      const direction = new THREE.Vector3();
+      const MAX_Y = 1000; // Limit for upward user movement
+      let moveUp = false;
+      let moveDown = false;
+
+      // Preview scenes management
+      const previewScenes = new Map(); // Store preview scenes by item ID
+
+      // Player configuration state
+      const configState = {
+        currentPage: "home",
+        selectedHabitat: null,
+        // Change selectedFurniture from Set to Map to track quantities
+        selectedFurniture: new Map(), // Store furniture ID -> quantity
+      };
+
+      // --- EVALUATION SYSTEM ---
+      const EvaluationSystem = {
+        // NASA Evaluation Metrics
+        calculateNHVScore: function (habitat, furniture) {
+          const requiredNHV = habitat.nhvRequired;
+          let usedNHV = 0;
+
+          furniture.forEach((count, furnitureId) => {
+            const furnitureItem = FURNITURE_CONFIG.find(
+              (f) => f.id === furnitureId
+            );
+            if (furnitureItem && furnitureItem.nhvProvided) {
+              usedNHV += furnitureItem.nhvProvided * count;
+            }
+          });
+
+          const nhvRatio = (usedNHV / requiredNHV) * 100;
+          const score = Math.min(100, nhvRatio);
+
+          return {
+            score: score,
+            usedNHV: usedNHV,
+            requiredNHV: requiredNHV,
+            ratio: nhvRatio,
+            status: score >= 100 ? "excellent" : score >= 80 ? "good" : "poor",
+          };
+        },
+
+        calculateAccessibilityScore: function (furniture) {
+          // Simplified path calculation based on module positions
+          let totalPathScore = 0;
+          let pathCount = 0;
+
+          // Get positions of key modules
+          const crewQuarters = furniture.get("FURNITURE_1")
+            ? { x: -15, z: -30 }
+            : null;
+          const hygiene = furniture.get("FURNITURE_4")
+            ? { x: -15, z: -45 }
+            : null;
+          const greenhouse = furniture.get("FURNITURE_8")
+            ? { x: 0, z: -60 }
+            : null;
+          const airlock = furniture.get("FURNITURE_6")
+            ? { x: 15, z: -45 }
+            : null;
+
+          // Calculate path distances
+          const paths = [];
+
+          if (crewQuarters && hygiene) {
+            const distance = Math.sqrt(
+              Math.pow(crewQuarters.x - hygiene.x, 2) +
+                Math.pow(crewQuarters.z - hygiene.z, 2)
+            );
+            paths.push({
+              from: "Crew Quarters",
+              to: "Hygiene",
+              distance: distance,
+            });
+          }
+
+          if (crewQuarters && greenhouse) {
+            const distance = Math.sqrt(
+              Math.pow(crewQuarters.x - greenhouse.x, 2) +
+                Math.pow(crewQuarters.z - greenhouse.z, 2)
+            );
+            paths.push({
+              from: "Crew Quarters",
+              to: "Greenhouse",
+              distance: distance,
+            });
+          }
+
+          if (crewQuarters && airlock) {
+            const distance = Math.sqrt(
+              Math.pow(crewQuarters.x - airlock.x, 2) +
+                Math.pow(crewQuarters.z - airlock.z, 2)
+            );
+            paths.push({
+              from: "Common Area",
+              to: "Airlock",
+              distance: distance,
+            });
+          }
+
+          // Calculate scores for each path
+          paths.forEach((path) => {
+            let pathScore;
+            if (path.distance <= 5) pathScore = 100;
+            else if (path.distance <= 10) pathScore = 70;
+            else pathScore = 40;
+
+            totalPathScore += pathScore;
+            pathCount++;
+          });
+
+          const avgScore = pathCount > 0 ? totalPathScore / pathCount : 0;
+
+          return {
+            score: avgScore,
+            paths: paths,
+            status:
+              avgScore >= 90 ? "excellent" : avgScore >= 70 ? "good" : "poor",
+          };
+        },
+
+        calculatePrivacyScore: function (furniture) {
+          let score = 0;
+          let criteriaCount = 0;
+
+          // Private crew quarters exist?
+          if (furniture.get("FURNITURE_1") > 0) {
+            score += 100;
+          }
+          criteriaCount++;
+
+          // Communal areas separated?
+          if (furniture.get("FURNITURE_2") > 0) {
+            score += 100;
+          }
+          criteriaCount++;
+
+          // Multi-functional spaces tagged?
+          const multiFunctionalModules = ["FURNITURE_2", "FURNITURE_3"]; // Common area and lab
+          let multiFunctionalCount = 0;
+          multiFunctionalModules.forEach((moduleId) => {
+            if (furniture.get(moduleId) > 0) multiFunctionalCount++;
+          });
+          score += (multiFunctionalCount / multiFunctionalModules.length) * 100;
+          criteriaCount++;
+
+          const finalScore = score / criteriaCount;
+
+          return {
+            score: finalScore,
+            status:
+              finalScore >= 80
+                ? "excellent"
+                : finalScore >= 60
+                ? "good"
+                : "poor",
+          };
+        },
+
+        calculateFeasibilityScore: function (habitat, furniture) {
+          let validModules = 0;
+          let totalModules = 1; // Start with habitat
+
+          // Check habitat dimensions (simplified)
+          if (
+            habitat.scale.x > 0 &&
+            habitat.scale.y > 0 &&
+            habitat.scale.z > 0
+          ) {
+            validModules++;
+          }
+
+          // Check furniture connections (simplified - just check if furniture exists)
+          furniture.forEach((count, furnitureId) => {
+            totalModules += count;
+            if (count > 0) validModules += count;
+          });
+
+          const score = (validModules / totalModules) * 100;
+
+          return {
+            score: score,
+            validModules: validModules,
+            totalModules: totalModules,
+            status: score >= 90 ? "excellent" : score >= 70 ? "good" : "poor",
+          };
+        },
+
+        calculateSustainabilityScore: function (furniture) {
+          const essentialModules = [
+            "FURNITURE_8", // Greenhouse
+            "FURNITURE_4", // Hygiene
+            "FURNITURE_9", // Life Support
+          ];
+
+          let includedModules = 0;
+          essentialModules.forEach((moduleId) => {
+            if (furniture.get(moduleId) > 0) includedModules++;
+          });
+
+          const score = (includedModules / essentialModules.length) * 100;
+
+          return {
+            score: score,
+            includedModules: includedModules,
+            totalEssential: essentialModules.length,
+            status: score >= 100 ? "excellent" : score >= 66 ? "good" : "poor",
+          };
+        },
+
+        calculateOverallScore: function (evaluation) {
+          const weights = {
+            nhv: 0.25,
+            accessibility: 0.2,
+            privacy: 0.15,
+            feasibility: 0.2,
+            sustainability: 0.2,
+          };
+
+          const weightedScore =
+            evaluation.nhv.score * weights.nhv +
+            evaluation.accessibility.score * weights.accessibility +
+            evaluation.privacy.score * weights.privacy +
+            evaluation.feasibility.score * weights.feasibility +
+            evaluation.sustainability.score * weights.sustainability;
+
+          return {
+            score: weightedScore,
+            status:
+              weightedScore >= 80
+                ? "excellent"
+                : weightedScore >= 60
+                ? "good"
+                : "poor",
+          };
+        },
+
+        getImprovementSuggestions: function (evaluation, habitat, furniture) {
+          const suggestions = [];
+
+          // NHV suggestions
+          if (evaluation.nhv.ratio < 100) {
+            suggestions.push(
+              `Increase habitable volume: Add more modules to reach ${
+                evaluation.nhv.requiredNHV
+              }m³ (currently ${evaluation.nhv.usedNHV.toFixed(1)}m³)`
+            );
+          }
+
+          // Accessibility suggestions
+          evaluation.accessibility.paths.forEach((path) => {
+            if (path.distance > 10) {
+              suggestions.push(
+                `Shorten path between ${path.from} and ${
+                  path.to
+                } (currently ${path.distance.toFixed(1)}m)`
+              );
+            }
+          });
+
+          // Privacy suggestions
+          if (furniture.get("FURNITURE_1") === 0) {
+            suggestions.push(
+              "Add private crew quarters for better crew well-being"
+            );
+          }
+
+          // Sustainability suggestions
+          if (
+            evaluation.sustainability.includedModules <
+            evaluation.sustainability.totalEssential
+          ) {
+            suggestions.push(
+              "Add essential life support modules: Greenhouse, Hygiene, and Life Support systems"
+            );
+          }
+
+          return suggestions;
+        },
+
+        runEvaluation: function (habitat, furniture) {
+          const nhv = this.calculateNHVScore(habitat, furniture);
+          const accessibility = this.calculateAccessibilityScore(furniture);
+          const privacy = this.calculatePrivacyScore(furniture);
+          const feasibility = this.calculateFeasibilityScore(
+            habitat,
+            furniture
+          );
+          const sustainability = this.calculateSustainabilityScore(furniture);
+          const overall = this.calculateOverallScore({
+            nhv,
+            accessibility,
+            privacy,
+            feasibility,
+            sustainability,
+          });
+          const suggestions = this.getImprovementSuggestions(
+            { nhv, accessibility, privacy, feasibility, sustainability },
+            habitat,
+            furniture
+          );
+
+          return {
+            nhv,
+            accessibility,
+            privacy,
+            feasibility,
+            sustainability,
+            overall,
+            suggestions,
+          };
+        },
+      };
+
+      // --- 3D ENVIRONMENT INITIALIZATION ---
+
+      function init3D() {
+        // Scene Setup
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000); // Black space
+        scene.fog = new THREE.Fog(0x000000, 100, 500);
+
+        // Camera Setup
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        camera.position.set(0, 5, 50);
+
+        // Renderer Setup
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting (Simulate Sun and reflected light)
+        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        sunLight.position.set(50, 50, 50);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 200;
+        sunLight.shadow.camera.left = -100;
+        sunLight.shadow.camera.right = 100;
+        sunLight.shadow.camera.top = 100;
+        sunLight.shadow.camera.bottom = -100;
+        scene.add(sunLight);
+
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+        scene.add(ambientLight);
+
+        // Add dedicated lighting for the interactive panel with increased radius
+        const panelLight1 = new THREE.PointLight(0x00ffff, 1.5, 20); // Increased from 10 to 20
+        panelLight1.position.set(0, 3, -15); // Position near the panel
+        scene.add(panelLight1);
+
+        const panelLight2 = new THREE.PointLight(0x00ffff, 1.0, 16); // Increased from 8 to 16
+        panelLight2.position.set(0, 2, -14); // Another light from different angle
+        scene.add(panelLight2);
+
+        const panelLight3 = new THREE.PointLight(0x00ffff, 0.8, 12); // Increased from 6 to 12
+        panelLight3.position.set(0, 2.5, -16); // Third light for back illumination
+        scene.add(panelLight3);
+
+        // Create Moon Surface (Large Plane)
+        const moonTexture = new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/moon_1024.jpg",
+          (texture) => {
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(50, 50);
+          }
+        );
+        const moonGeometry = new THREE.PlaneGeometry(1000, 1000);
+        const moonMaterial = new THREE.MeshStandardMaterial({
+          map: moonTexture,
+          side: THREE.DoubleSide,
+          roughness: 0.9,
+          metalness: 0.1,
+        });
+        const moonSurface = new THREE.Mesh(moonGeometry, moonMaterial);
+        moonSurface.rotation.x = -Math.PI / 2; // Rotate to lie flat
+        moonSurface.receiveShadow = true;
+        moonSurface.name = "MoonSurface";
+        scene.add(moonSurface);
+
+        // Add some lunar rocks scattered on the surface
+        const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
+        const rockMaterial = new THREE.MeshStandardMaterial({
+          color: 0xaaaaaa,
+          roughness: 0.95,
+          metalness: 0.05,
+        });
+
+        for (let i = 0; i < 50; i++) {
+          const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+          rock.position.set(
+            Math.random() * 400 - 200,
+            Math.random() * 0.5,
+            Math.random() * 400 - 200
+          );
+          rock.scale.set(
+            Math.random() * 2 + 0.5,
+            Math.random() * 0.8 + 0.5,
+            Math.random() * 2 + 0.5
+          );
+          rock.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+          );
+          rock.castShadow = true;
+          rock.receiveShadow = true;
+          scene.add(rock);
+        }
+
+        // Create a starfield for space
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsMaterial = new THREE.PointsMaterial({
+          color: 0xffffff,
+          size: 0.7,
+          transparent: true,
+        });
+
+        const starsVertices = [];
+        for (let i = 0; i < 10000; i++) {
+          const x = (Math.random() - 0.5) * 2000;
+          const y = (Math.random() - 0.5) * 2000;
+          const z = (Math.random() - 0.5) * 2000;
+          starsVertices.push(x, y, z);
+        }
+
+        starsGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(starsVertices, 3)
+        );
+        const stars = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(stars);
+
+        // Add Earth in the distance
+        const earthGeometry = new THREE.SphereGeometry(10, 32, 32);
+        const earthTexture = new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg"
+        );
+        const earthMaterial = new THREE.MeshStandardMaterial({
+          map: earthTexture,
+          roughness: 0.8,
+          metalness: 0.2,
+        });
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        earth.position.set(100, 50, -200);
+        scene.add(earth);
+
+        // Create 3D Interactive Screen (Using your custom panel model)
+        loader.load(
+          "materials/sci-fi_panels.glb", // Replace with your actual panel model path
+          (gltf) => {
+            interactiveScreen = gltf.scene;
+            interactiveScreen.position.set(0, 1.5, -15);
+            interactiveScreen.scale.set(0.03, 0.03, 0.03); // Adjust scale as needed
+            interactiveScreen.traverse((node) => {
+              if (node.isMesh) {
+                node.castShadow = false;
+                node.receiveShadow = false;
+              }
+            });
+            interactiveScreen.name = "InteractiveScreen";
+            scene.add(interactiveScreen);
+            screenBoundingBox = new THREE.Box3().setFromObject(
+              interactiveScreen
+            );
+          },
+          (xhr) => {
+            console.log(
+              (xhr.loaded / xhr.total) * 100 + "% loaded: Interactive Panel"
+            );
+          },
+          (error) => {
+            console.error("Error loading interactive panel:", error);
+            // Fallback to simple box if GLB fails to load
+            const screenGeometry = new THREE.BoxGeometry(3, 3, 0.2);
+            const screenMaterial = new THREE.MeshPhongMaterial({
+              color: 0x00ffff,
+              emissive: 0x002244,
+            });
+            interactiveScreen = new THREE.Mesh(screenGeometry, screenMaterial);
+            interactiveScreen.position.set(10, 1.5, -20);
+            interactiveScreen.castShadow = true;
+            interactiveScreen.name = "InteractiveScreen";
+            scene.add(interactiveScreen);
+            screenBoundingBox = new THREE.Box3().setFromObject(
+              interactiveScreen
+            );
+          }
+        );
+
+        // Create Table
+        loader.load(
+          "3d/matte_black_pub_table.glb", // Table model path
+          (gltf) => {
+            table = gltf.scene;
+            table.position.set(12, 0, -15); // Position next to the interactive panel
+            table.scale.set(0.7, 0.7, 0.7); // Adjust scale as needed
+            table.traverse((node) => {
+              if (node.isMesh) {
+                node.castShadow = true;
+                node.receiveShadow = true;
+              }
+            });
+            table.name = "Table";
+            scene.add(table);
+            tableBoundingBox = new THREE.Box3().setFromObject(table);
+
+            // Load device after table is loaded
+            loadDeviceOnTable();
+          },
+          (xhr) => {
+            console.log((xhr.loaded / xhr.total) * 100 + "% loaded: Table");
+          },
+          (error) => {
+            console.error("Error loading table:", error);
+            // Fallback to simple geometry if GLB fails to load
+            const tableGeometry = new THREE.BoxGeometry(2, 1, 1);
+            const tableMaterial = new THREE.MeshStandardMaterial({
+              color: 0x8b4513,
+              roughness: 0.8,
+            });
+            table = new THREE.Mesh(tableGeometry, tableMaterial);
+            table.position.set(12, 0.5, -15);
+            table.castShadow = true;
+            table.receiveShadow = true;
+            table.name = "Table";
+            scene.add(table);
+            tableBoundingBox = new THREE.Box3().setFromObject(table);
+
+            // Load device after table is loaded
+            loadDeviceOnTable();
+          }
+        );
+
+        // Function to load device on top of table
+        function loadDeviceOnTable() {
+          loader.load(
+            "3d/vr-headset.glb", // Device model path
+            (gltf) => {
+              device = gltf.scene;
+
+              // Position device on top of the table
+              const tableHeight =
+                tableBoundingBox.max.y - tableBoundingBox.min.y;
+              device.position.set(12, tableHeight + 0.2, -15); // Position on top of table
+              device.scale.set(0.007, 0.007, 0.007); // Adjust scale as needed
+
+              device.traverse((node) => {
+                if (node.isMesh) {
+                  node.castShadow = true;
+                  node.receiveShadow = true;
+                }
+              });
+              device.name = "Device";
+              scene.add(device);
+              deviceBoundingBox = new THREE.Box3().setFromObject(device);
+
+              // Add lighting specifically for the table and device
+              const tableLight = new THREE.PointLight(0xffaa00, 1.0, 10);
+              tableLight.position.set(12, 3, -15);
+              scene.add(tableLight);
+            },
+            (xhr) => {
+              console.log((xhr.loaded / xhr.total) * 100 + "% loaded: Device");
+            },
+            (error) => {
+              console.error("Error loading device:", error);
+              // Fallback to simple geometry if GLB fails to load
+              const deviceGeometry = new THREE.BoxGeometry(0.5, 0.2, 0.3);
+              const deviceMaterial = new THREE.MeshStandardMaterial({
+                color: 0x444444,
+                metalness: 0.8,
+                roughness: 0.2,
+              });
+              device = new THREE.Mesh(deviceGeometry, deviceMaterial);
+
+              // Position device on top of the table
+              const tableHeight =
+                tableBoundingBox.max.y - tableBoundingBox.min.y;
+              device.position.set(12, tableHeight + 0.2, -15);
+              device.castShadow = true;
+              device.name = "Device";
+              scene.add(device);
+              deviceBoundingBox = new THREE.Box3().setFromObject(device);
+
+              // Add lighting specifically for the table and device
+              const tableLight = new THREE.PointLight(0xffaa00, 1.0, 10);
+              tableLight.position.set(12, 3, -15);
+              scene.add(tableLight);
+            }
+          );
+        }
+
+        // PointerLockControls Setup - We DO NOT call .lock() here anymore.
+        controls = new THREE.PointerLockControls(camera, document.body);
+
+        // Event listeners for controls
+        document.addEventListener("keydown", onKeyDown, false);
+        document.addEventListener("keyup", onKeyUp, false);
+        window.addEventListener("resize", onWindowResize, false);
+
+        // Initial camera position for "spawn" on the surface
+        camera.position.set(0, 5, 0);
+
+        animate();
+      }
+
+      /**
+       * Sets up the initial screen and listener for pointer lock.
+       * This is necessary because pointer lock requires a user gesture (like a click)
+       * to activate, especially within an iframe/sandboxed environment.
+       */
+      function setupStartScreen() {
+        const startScreen = document.getElementById("start-screen");
+        const enter3dButton = document.getElementById("enter-3d");
+
+        enter3dButton.addEventListener("click", () => {
+          // Request pointer lock controls on user click
+          controls.lock();
+          startScreen.style.display = "none";
+        });
+      }
+
+      // --- 3D PREVIEW SYSTEM ---
+
+      function createPreviewScene(item, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        // Clear existing content
+        container.innerHTML = "";
+
+        // Create canvas for preview
+        const canvas = document.createElement("canvas");
+        canvas.className = "preview-canvas";
+        container.appendChild(canvas);
+
+        // Create loading indicator
+        const loading = document.createElement("div");
+        loading.className = "preview-loading";
+        loading.textContent = "Loading 3D Preview...";
+        container.appendChild(loading);
+
+        // Set up preview scene
+        const previewScene = new THREE.Scene();
+        previewScene.background = new THREE.Color(0x1a202c); // Dark gray background
+
+        // Set up preview camera
+        const previewCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+        previewCamera.position.set(0, 0, 5);
+
+        // Set up preview renderer
+        const previewRenderer = new THREE.WebGLRenderer({
+          canvas: canvas,
+          antialias: true,
+          alpha: true,
+        });
+        previewRenderer.setSize(container.offsetWidth, container.offsetHeight);
+        previewRenderer.setClearColor(0x000000, 0);
+
+        // Lighting for preview
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        previewScene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        previewScene.add(directionalLight);
+
+        const backLight = new THREE.DirectionalLight(0x404040, 0.4);
+        backLight.position.set(-1, -1, -1);
+        previewScene.add(backLight);
+
+        // Load the model
+        loader.load(
+          item.url,
+          (gltf) => {
+            const model = gltf.scene;
+
+            // Apply preview-specific transformations
+            model.scale.set(
+              item.previewScale || 1,
+              item.previewScale || 1,
+              item.previewScale || 1
+            );
+
+            model.position.set(
+              item.previewPosition?.x || 0,
+              item.previewPosition?.y || 0,
+              item.previewPosition?.z || 0
+            );
+
+            model.rotation.y = item.rotation.y || 0;
+
+            previewScene.add(model);
+
+            // Remove loading indicator
+            loading.remove();
+
+            // Store preview scene for animation
+            previewScenes.set(item.id, {
+              scene: previewScene,
+              camera: previewCamera,
+              renderer: previewRenderer,
+              model: model,
+            });
+
+            // Start animation
+            animatePreview(item.id);
+          },
+          (xhr) => {
+            // Loading progress
+            const percent = (xhr.loaded / xhr.total) * 100;
+            loading.textContent = `Loading: ${percent.toFixed(0)}%`;
+          },
+          (error) => {
+            console.error(`Error loading preview for ${item.name}:`, error);
+            loading.textContent = "Failed to load preview";
+            loading.style.color = "#ef4444";
+          }
+        );
+
+        // Handle container resize
+        const resizeObserver = new ResizeObserver(() => {
+          previewRenderer.setSize(
+            container.offsetWidth,
+            container.offsetHeight
+          );
+          previewCamera.aspect = container.offsetWidth / container.offsetHeight;
+          previewCamera.updateProjectionMatrix();
+        });
+        resizeObserver.observe(container);
+      }
+
+      function animatePreview(itemId) {
+        const previewData = previewScenes.get(itemId);
+        if (!previewData) return;
+
+        // Rotate model slowly for better visualization
+        if (previewData.model) {
+          previewData.model.rotation.y += 0.01;
+        }
+
+        previewData.renderer.render(previewData.scene, previewData.camera);
+        requestAnimationFrame(() => animatePreview(itemId));
+      }
+
+      function cleanupPreviews() {
+        // Clean up all preview scenes when leaving configuration UI
+        previewScenes.forEach((previewData, itemId) => {
+          if (previewData.renderer) {
+            previewData.renderer.dispose();
+          }
+        });
+        previewScenes.clear();
+      }
+
+      // --- 3D ENVIRONMENT RESIZING ---
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // --- 3D USER MOVEMENT AND INTERACTION ---
+
+      function onKeyDown(event) {
+        switch (event.code) {
+          case "KeyW":
+            moveForward = true;
+            break;
+          case "KeyA":
+            moveLeft = true;
+            break;
+          case "KeyS":
+            moveBackward = true;
+            break;
+          case "KeyD":
+            moveRight = true;
+            break;
+          case "Space":
+            moveUp = true; // Keep this as is
+            break;
+          case "ShiftLeft":
+          case "ShiftRight":
+            moveDown = true; // Keep this as is
+            break;
+          case "KeyE":
+            if (
+              document.getElementById("config-ui").classList.contains("hidden")
+            ) {
+              handleEKeyInteraction();
+            }
+            break;
+          // Furniture Manipulation Controls (Active only when an object is selected)
+          case "ArrowUp":
+          case "ArrowDown":
+          case "ArrowLeft":
+          case "ArrowRight":
+          case "KeyQ":
+          case "KeyR":
+            if (selectedObject) {
+              event.preventDefault(); // Prevent page scrolling
+              handleObjectManipulation(event.code, event.shiftKey);
+            }
+            break;
+          case "KeyO":
+          case "KeyP":
+            if (selectedObject) {
+              event.preventDefault();
+              handleObjectManipulation(event.code, event.shiftKey);
+            }
+            break;
+          // Removed Z/X scaling keys
+          case "KeyF":
+            if (nearestObject && !selectedObject) {
+              selectObject(nearestObject);
+            } else if (selectedObject) {
+              deselectObject();
+            }
+            break;
+        }
+      }
+
+      function onKeyUp(event) {
+        switch (event.code) {
+          case "KeyW":
+            moveForward = false;
+            break;
+          case "KeyA":
+            moveLeft = false;
+            break;
+          case "KeyS":
+            moveBackward = false;
+            break;
+          case "KeyD":
+            moveRight = false;
+            break;
+          case "Space":
+            moveUp = false; // Keep this as is
+            break;
+          case "ShiftLeft":
+          case "ShiftRight":
+            moveDown = false; // Keep this as is
+            break;
+        }
+      }
+
+      function handleEKeyInteraction() {
+        const cameraPos = camera.position;
+        const distanceToScreen = cameraPos.distanceTo(
+          interactiveScreen.position
+        );
+        const distanceToDevice = device
+          ? cameraPos.distanceTo(device.position)
+          : Infinity;
+        const INTERACT_RANGE = 8; // Distance to open the config UI
+
+        // Check if close to the interactive screen
+        if (distanceToScreen <= INTERACT_RANGE && !selectedObject) {
+          // 1. Interact with the Screen
+          showConfigUI();
+          return;
+        }
+
+        // Check if close to the device
+        if (distanceToDevice <= INTERACT_RANGE && !selectedObject) {
+          // 2. Interact with the Device on Table
+          openWebsite();
+          return;
+        }
+
+        // 3. Interact with Spawned Objects (Furniture/Habitat)
+        const raycaster = new THREE.Raycaster(
+          camera.position,
+          camera.getWorldDirection(direction)
+        );
+        const intersects = raycaster.intersectObjects(
+          spawnedObjects.map((o) => o.mesh),
+          true
+        );
+
+        if (selectedObject) {
+          // Deselect the current object
+          deselectObject();
+        } else if (intersects.length > 0) {
+          // Select the nearest object
+          const mesh = intersects[0].object;
+          let topLevelObject = mesh;
+          // Traverse up the hierarchy to find the root object we loaded (the GLTF scene)
+          while (topLevelObject.parent && topLevelObject.parent !== scene) {
+            topLevelObject = topLevelObject.parent;
+          }
+
+          if (spawnedObjects.some((o) => o.mesh === topLevelObject)) {
+            selectObject(topLevelObject);
+          }
+        }
+      }
+
+      function openWebsite() {
+        // Open a new website in the same tab
+        window.location.href = "dopa.html";
+
+        // Update interaction prompt
+        const prompt = document.getElementById("interaction-prompt");
+        prompt.textContent = "Opening website...";
+        prompt.classList.add("opacity-100");
+      }
+
+      function selectObject(mesh) {
+        if (selectedObject === mesh) return;
+
+        // Deselect existing
+        if (selectedObject) deselectObject();
+
+        selectedObject = mesh;
+        console.log("Object selected:", selectedObject.name);
+
+        // Add an outline/highlight (using a scaled cube for simplicity)
+        const box = new THREE.Box3().setFromObject(selectedObject);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+
+        const geometry = new THREE.BoxGeometry(
+          size.x * 1.05,
+          size.y * 1.05,
+          size.z * 1.05
+        );
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xffff00,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.8,
+        });
+        selectedObjectOutline = new THREE.Mesh(geometry, material);
+
+        selectedObjectOutline.position.copy(center);
+        selectedObjectOutline.rotation.copy(selectedObject.rotation);
+        scene.add(selectedObjectOutline);
+
+        // Show position display
+        updatePositionDisplay();
+        document.getElementById("position-display").classList.remove("hidden");
+
+        // Update prompt to show manipulation controls
+        const prompt = document.getElementById("interaction-prompt");
+        prompt.textContent =
+          "Object Selected! Use Arrows to Move, O/P to Rotate, Q/R for Height.";
+        prompt.classList.add("opacity-100");
+      }
+
+      function deselectObject() {
+        if (selectedObjectOutline) {
+          scene.remove(selectedObjectOutline);
+          selectedObjectOutline.geometry.dispose();
+          selectedObjectOutline.material.dispose();
+          selectedObjectOutline = null;
+        }
+        selectedObject = null;
+        console.log("Object deselected.");
+
+        // Hide position display
+        document.getElementById("position-display").classList.add("hidden");
+
+        // Clear prompt
+        const prompt = document.getElementById("interaction-prompt");
+        prompt.textContent = "Press [E] to Interact";
+        prompt.classList.remove("opacity-100");
+      }
+
+      function handleObjectManipulation(key, isShift) {
+        if (!selectedObject) return;
+
+        const speed = 0.5;
+        const rotationSpeed = Math.PI / 32;
+
+        switch (key) {
+          // Movement (X/Z plane)
+          case "ArrowUp":
+            selectedObject.position.z -= speed;
+            break;
+          case "ArrowDown":
+            selectedObject.position.z += speed;
+            break;
+          case "ArrowLeft":
+            selectedObject.position.x -= speed;
+            break;
+          case "ArrowRight":
+            selectedObject.position.x += speed;
+            break;
+          // Y-Axis Movement
+          case "KeyQ":
+            selectedObject.position.y += speed;
+            break; // Up
+          case "KeyR":
+            selectedObject.position.y -= speed;
+            break; // Down
+
+          case "KeyO":
+            selectedObject.rotation.y += rotationSpeed;
+            break;
+          case "KeyP":
+            selectedObject.rotation.y -= rotationSpeed;
+            break;
+        }
+
+        // Enforce ground constraint and update outline
+        selectedObject.position.y = Math.max(selectedObject.position.y, 0.1); // Cannot go below ground
+        updateOutlinePosition();
+        updatePositionDisplay(); // Update the position display
+      }
+
+      function updateOutlinePosition() {
+        if (selectedObject && selectedObjectOutline) {
+          // Recalculate center based on current position/rotation
+          const box = new THREE.Box3().setFromObject(selectedObject);
+          const center = box.getCenter(new THREE.Vector3());
+
+          selectedObjectOutline.position.copy(center);
+          selectedObjectOutline.rotation.copy(selectedObject.rotation);
+          selectedObjectOutline.scale.copy(selectedObject.scale);
+        }
+      }
+
+      // New function to update the position display
+      function updatePositionDisplay() {
+        if (selectedObject) {
+          const display = document.getElementById("position-display");
+          const nameElement = document.getElementById("selected-object-name");
+          const posX = document.getElementById("pos-x");
+          const posY = document.getElementById("pos-y");
+          const posZ = document.getElementById("pos-z");
+          const rotY = document.getElementById("rot-y");
+
+          nameElement.textContent = selectedObject.name;
+          posX.textContent = selectedObject.position.x.toFixed(2);
+          posY.textContent = selectedObject.position.y.toFixed(2);
+          posZ.textContent = selectedObject.position.z.toFixed(2);
+          rotY.textContent = selectedObject.rotation.y.toFixed(2);
+        }
+      }
+
+      // --- ANIMATION LOOP ---
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        const MOON_GRAVITY = 9.81 / 6; // Low gravity simulation
+        const MOON_FRICTION = 0.9;
+        const MOON_SPEED = 150.0;
+
+        // Selection hint visibility check
+        if (!selectedObject) {
+          findNearestObject();
+          const selectionHint = document.getElementById("selection-hint");
+
+          if (
+            nearestObject &&
+            camera.position.distanceTo(nearestObject.position) <=
+              SELECTION_RANGE
+          ) {
+            selectionHint.classList.add("opacity-100");
+          } else {
+            selectionHint.classList.remove("opacity-100");
+            nearestObject = null;
+          }
+        }
+
+        if (controls.isLocked) {
+          // Apply friction and gravity
+          velocity.x *= MOON_FRICTION;
+          velocity.z *= MOON_FRICTION;
+
+          // Calculate direction vectors
+          direction.z = Number(moveForward) - Number(moveBackward);
+          direction.x = Number(moveRight) - Number(moveLeft);
+          direction.normalize(); // Ensure constant speed when moving diagonally
+
+          // Apply acceleration
+          if (moveForward || moveBackward)
+            velocity.z -= direction.z * MOON_SPEED * delta;
+          if (moveLeft || moveRight)
+            velocity.x -= direction.x * MOON_SPEED * delta;
+          // Handle flying up/down
+          if (moveUp) {
+            velocity.y += 35 * delta;
+          }
+          if (moveDown) {
+            velocity.y -= 35 * delta;
+          }
+          // Stop vertical movement when not pressing space/shift (hover)
+          if (!moveUp && !moveDown) {
+            velocity.y = 0; // Stop vertical movement instead of applying gravity
+          }
+
+          // Move controls
+          controls.moveRight(-velocity.x * delta);
+          controls.moveForward(-velocity.z * delta);
+
+          camera.position.y += velocity.y * delta; // Apply vertical movement
+
+          // Ground clamping (only if not flying)
+          if (camera.position.y < 5 && !moveUp && velocity.y < 0) {
+            velocity.y = 0;
+            camera.position.y = 5; // Fixed height above ground
+            isJumping = false;
+          }
+          // Maximum height limit
+          if (camera.position.y > MAX_Y) {
+            camera.position.y = MAX_Y;
+            velocity.y = 0;
+          }
+
+          // Interaction prompt visibility check
+          const distanceToScreen = camera.position.distanceTo(
+            interactiveScreen.position
+          );
+          const distanceToDevice = device
+            ? camera.position.distanceTo(device.position)
+            : Infinity;
+          const prompt = document.getElementById("interaction-prompt");
+
+          if (distanceToScreen < 8 || distanceToDevice < 8) {
+            // Check if object is selected, if so, the prompt is handled in select/deselect
+            if (!selectedObject) {
+              if (distanceToScreen < 8) {
+                prompt.textContent = "Press [E] to Interact with Config Screen";
+              } else if (distanceToDevice < 8) {
+                prompt.textContent = "Press [E] to Enter DopaminoMeter";
+              }
+              prompt.classList.add("opacity-100");
+            }
+          } else {
+            if (!selectedObject) {
+              prompt.classList.remove("opacity-100");
+            }
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      function findNearestObject() {
+        if (spawnedObjects.length === 0) {
+          nearestObject = null;
+          return;
+        }
+
+        let closestDistance = SELECTION_RANGE;
+        nearestObject = null;
+
+        spawnedObjects.forEach((obj) => {
+          const distance = camera.position.distanceTo(obj.mesh.position);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            nearestObject = obj.mesh;
+          }
+        });
+      }
+
+      // --- 2D CONFIGURATION UI FUNCTIONS ---
+
+      function showConfigUI() {
+        // Pause 3D interaction and show overlay
+        const ui = document.getElementById("config-ui");
+        const container = document.getElementById("config-container");
+
+        // Set initial state for transition
+        container.classList.remove("translate-y-0");
+        container.classList.add("translate-y-10");
+        ui.classList.remove("hidden");
+        controls.unlock(); // Release cursor
+
+        setTimeout(() => {
+          ui.classList.add("opacity-100");
+          container.classList.remove("translate-y-10");
+          container.classList.add("translate-y-0");
+        }, 10); // Short delay for CSS transition
+
+        renderCurrentPage();
+      }
+
+      function hideConfigUI() {
+        cleanupPreviews(); // Clean up preview scenes
+
+        const ui = document.getElementById("config-ui");
+        const container = document.getElementById("config-container");
+
+        container.classList.remove("translate-y-0");
+        container.classList.add("translate-y-10");
+        ui.classList.remove("opacity-100");
+
+        setTimeout(() => {
+          ui.classList.add("hidden");
+          controls.lock(); // Re-lock cursor for 3D navigation
+        }, 400); // Wait for transition
+      }
+
+      function goToPage(page) {
+        cleanupPreviews(); // Clean up previous previews
+        configState.currentPage = page;
+        renderCurrentPage();
+      }
+
+      function renderCurrentPage() {
+        const container = document.getElementById("config-container");
+        container.innerHTML = "";
+
+        // This switch block handles all 4 pages
+        switch (configState.currentPage) {
+          case "home":
+            container.innerHTML = createHomePage();
+            break;
+          case "habitats":
+            container.innerHTML = createHabitatPage();
+            break;
+          case "furniture":
+            container.innerHTML = createFurniturePage();
+            break;
+          case "evaluate":
+            container.innerHTML = createEvaluationPage();
+            break;
+          default:
+            container.innerHTML = "<h1>Error</h1><p>Page not found.</p>";
+        }
+
+        // Re-attach event listeners after innerHTML update
+        attachPageListeners(configState.currentPage);
+      }
+
+      // --- 2D PAGE TEMPLATES ---
+
+      function createHomePage() {
+        return `
+                    <div class="space-y-6 text-center">
+                        <h1 class="text-4xl font-extrabold text-gray-900">Lunar Base Configuration Terminal</h1>
+                        <p class="text-lg text-gray-600">Welcome, Commander. Use this interface to design and configure your deep-space habitat. Once confirmed, your structure will be materialized on the surface.</p>
+                        <button onclick="goToPage('habitats')" class="w-full max-w-sm mx-auto flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-10 shadow-lg transition duration-150 transform hover:scale-[1.01] hover:shadow-xl">
+                            Begin Configuration
+                        </button>
+                        <p class="text-sm text-gray-400 mt-4">Security Protocol Level 5. All changes are final upon confirmation.</p>
+                    </div>
+                `;
+      }
+
+      function createHabitatPage() {
+        const selectedId = configState.selectedHabitat
+          ? configState.selectedHabitat.id
+          : null;
+        return `
+                    <div class="space-y-6">
+                        <h2 class="text-3xl font-bold text-gray-900 border-b pb-2">Step 1: Choose Your Habitat</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            ${HABITAT_CONFIG.map(
+                              (h) => `
+                                <div id="habitat-card-${
+                                  h.id
+                                }" class="habitat-card p-4 rounded-lg border-2 ${
+                                selectedId === h.id
+                                  ? "border-indigo-500 ring-4 ring-indigo-200"
+                                  : "border-gray-200"
+                              } shadow-md hover:shadow-xl transition duration-200 cursor-pointer" data-id="${
+                                h.id
+                              }">
+                                    <div class="text-xl font-semibold mb-2">${
+                                      h.name
+                                    }</div>
+                                    <div class="h-24 bg-gray-100 rounded-md mb-3">
+                                        <div id="preview-habitat-${
+                                          h.id
+                                        }" class="preview-container"></div>
+                                    </div>
+                                    <p class="text-sm text-gray-500 h-10 overflow-hidden">${h.description.substring(
+                                      0,
+                                      60
+                                    )}...</p>
+                                    <div class="mt-4 flex justify-between items-center">
+                                        <button data-id="${
+                                          h.id
+                                        }" class="details-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 transition duration-150">
+                                            Details
+                                        </button>
+                                        <button data-id="${
+                                          h.id
+                                        }" class="select-btn text-xs font-medium ${
+                                selectedId === h.id
+                                  ? "text-white bg-indigo-500 px-3 py-1 rounded-full"
+                                  : "text-indigo-500 border border-indigo-500 px-3 py-1 rounded-full hover:bg-indigo-50 hover:text-indigo-600"
+                              }">
+                                            ${
+                                              selectedId === h.id
+                                                ? "Selected"
+                                                : "Select"
+                                            }
+                                        </button>
+                                    </div>
+                                </div>
+                            `
+                            ).join("")}
+                        </div>
+                        <div id="habitat-details-panel" class="detail-panel-transition p-4 bg-gray-100 rounded-lg hidden opacity-0 transform translate-y-4"></div>
+                        <div class="flex justify-end pt-4 border-t">
+                            <button ${
+                              !configState.selectedHabitat ? "disabled" : ""
+                            } onclick="goToPage('furniture')" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next: Choose Furniture &rarr;
+                            </button>
+                        </div>
+                    </div>
+                `;
+      }
+
+      function createFurniturePage() {
+        // Calculate total count of all furniture items
+        let totalCount = 0;
+        configState.selectedFurniture.forEach((count) => {
+          totalCount += count;
+        });
+
+        return `
+                    <div class="space-y-6">
+                        <h2 class="text-3xl font-bold text-gray-900 border-b pb-2">Step 2: Choose Furniture</h2>
+                        
+                        <!-- Furniture Counter -->
+                        <div class="flex items-center justify-between bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-blue-100 p-2 rounded-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-blue-800">Furniture Selection</h3>
+                                    <p class="text-sm text-blue-600">Add as many furniture items as needed</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-blue-700">${totalCount}</div>
+                                <div class="text-xs text-blue-500">Total Items Selected</div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            ${FURNITURE_CONFIG.map((f) => {
+                              const count =
+                                configState.selectedFurniture.get(f.id) || 0;
+                              return `
+                                    <div id="furniture-card-${
+                                      f.id
+                                    }" class="furniture-card p-3 rounded-lg border-2 ${
+                                count > 0
+                                  ? "border-sky-500 ring-4 ring-sky-200"
+                                  : "border-gray-200"
+                              } shadow-sm transition duration-200">
+                                        <div class="text-base font-semibold mb-1 truncate">${
+                                          f.name
+                                        }</div>
+                                        <div class="h-16 bg-gray-100 rounded-md mb-2">
+                                            <div id="preview-furniture-${
+                                              f.id
+                                            }" class="preview-container"></div>
+                                        </div>
+                                        <div class="flex flex-col items-center space-y-2">
+                                            <div class="flex items-center space-x-2">
+                                                <button data-id="${
+                                                  f.id
+                                                }" data-action="decrease" class="counter-btn text-xs font-medium bg-gray-200 text-gray-700 px-2 py-1 rounded-full hover:bg-gray-300 transition duration-150 ${
+                                count === 0
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              }">
+                                                    -
+                                                </button>
+                                                <span class="text-sm font-medium">${count}</span>
+                                                <button data-id="${
+                                                  f.id
+                                                }" data-action="increase" class="counter-btn text-xs font-medium bg-sky-500 text-white px-2 py-1 rounded-full hover:bg-sky-600 transition duration-150">
+                                                    +
+                                                </button>
+                                            </div>
+                                            <button data-id="${
+                                              f.id
+                                            }" class="details-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 transition duration-150">
+                                                Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join("")}
+                        </div>
+                        <div id="furniture-details-panel" class="detail-panel-transition p-4 bg-gray-100 rounded-lg hidden opacity-0 transform translate-y-4"></div>
+                        <div class="flex justify-between pt-4 border-t">
+                            <button onclick="goToPage('habitats')" class="px-4 py-2 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-150">
+                                &larr; Back
+                            </button>
+                            <button ${
+                              totalCount === 0 ? "disabled" : ""
+                            } onclick="goToPage('evaluate')" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next: NASA Evaluation &rarr;
+                            </button>
+                        </div>
+                    </div>
+                `;
+      }
+
+      function createEvaluationPage() {
+        const habitat = configState.selectedHabitat;
+        const evaluation = EvaluationSystem.runEvaluation(
+          habitat,
+          configState.selectedFurniture
+        );
+
+        // Create furniture list with quantities
+        const furnitureDetails = [];
+        configState.selectedFurniture.forEach((count, id) => {
+          if (count > 0) {
+            const furniture = FURNITURE_CONFIG.find((f) => f.id === id);
+            furnitureDetails.push({ ...furniture, count });
+          }
+        });
+
+        // Calculate total furniture count
+        const totalFurnitureCount = furnitureDetails.reduce(
+          (total, f) => total + f.count,
+          0
+        );
+
+        return `
+                    <div class="space-y-8">
+                        <h2 class="text-3xl font-bold text-gray-900 border-b pb-2">Step 3: NASA Habitat Evaluation</h2>
+
+                        <!-- Overall Score -->
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-2xl font-bold text-gray-800">Overall Habitat Score</h3>
+                                <div class="text-right">
+                                    <div class="text-4xl font-bold ${
+                                      evaluation.overall.status === "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.overall.status === "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.overall.score.toFixed(
+                                          1
+                                        )}/100
+                                    </div>
+                                    <div class="text-sm font-medium ${
+                                      evaluation.overall.status === "excellent"
+                                        ? "text-green-700"
+                                        : evaluation.overall.status === "good"
+                                        ? "text-yellow-700"
+                                        : "text-red-700"
+                                    }">
+                                        ${
+                                          evaluation.overall.status ===
+                                          "excellent"
+                                            ? "Excellent - Mission Ready"
+                                            : evaluation.overall.status ===
+                                              "good"
+                                            ? "Good - Minor Improvements Needed"
+                                            : "Poor - Significant Improvements Required"
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div class="h-4 rounded-full ${
+                                  evaluation.overall.status === "excellent"
+                                    ? "score-excellent"
+                                    : evaluation.overall.status === "good"
+                                    ? "score-good"
+                                    : "score-poor"
+                                }" 
+                                     style="width: ${
+                                       evaluation.overall.score
+                                     }%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Evaluation Breakdown -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- NHV Compliance -->
+                            <div class="p-4 border rounded-lg">
+                                <h4 class="font-semibold text-lg mb-2">Habitable Volume (NHV)</h4>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm">Used: ${evaluation.nhv.usedNHV.toFixed(
+                                      1
+                                    )}m³ / Required: ${
+          evaluation.nhv.requiredNHV
+        }m³</span>
+                                    <span class="font-bold ${
+                                      evaluation.nhv.status === "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.nhv.status === "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.nhv.score.toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full ${
+                                      evaluation.nhv.status === "excellent"
+                                        ? "score-excellent"
+                                        : evaluation.nhv.status === "good"
+                                        ? "score-good"
+                                        : "score-poor"
+                                    }" 
+                                         style="width: ${
+                                           evaluation.nhv.score
+                                         }%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Circulation & Accessibility -->
+                            <div class="p-4 border rounded-lg">
+                                <h4 class="font-semibold text-lg mb-2">Circulation & Accessibility</h4>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm">Path efficiency</span>
+                                    <span class="font-bold ${
+                                      evaluation.accessibility.status ===
+                                      "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.accessibility.status ===
+                                          "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.accessibility.score.toFixed(
+                                          1
+                                        )}%
+                                    </span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full ${
+                                      evaluation.accessibility.status ===
+                                      "excellent"
+                                        ? "score-excellent"
+                                        : evaluation.accessibility.status ===
+                                          "good"
+                                        ? "score-good"
+                                        : "score-poor"
+                                    }" 
+                                         style="width: ${
+                                           evaluation.accessibility.score
+                                         }%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Privacy & Well-Being -->
+                            <div class="p-4 border rounded-lg">
+                                <h4 class="font-semibold text-lg mb-2">Privacy & Well-Being</h4>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm">Crew comfort factors</span>
+                                    <span class="font-bold ${
+                                      evaluation.privacy.status === "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.privacy.status === "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.privacy.score.toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full ${
+                                      evaluation.privacy.status === "excellent"
+                                        ? "score-excellent"
+                                        : evaluation.privacy.status === "good"
+                                        ? "score-good"
+                                        : "score-poor"
+                                    }" 
+                                         style="width: ${
+                                           evaluation.privacy.score
+                                         }%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Structural Feasibility -->
+                            <div class="p-4 border rounded-lg">
+                                <h4 class="font-semibold text-lg mb-2">Structural Feasibility</h4>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm">Valid modules: ${
+                                      evaluation.feasibility.validModules
+                                    }/${
+          evaluation.feasibility.totalModules
+        }</span>
+                                    <span class="font-bold ${
+                                      evaluation.feasibility.status ===
+                                      "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.feasibility.status ===
+                                          "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.feasibility.score.toFixed(
+                                          1
+                                        )}%
+                                    </span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full ${
+                                      evaluation.feasibility.status ===
+                                      "excellent"
+                                        ? "score-excellent"
+                                        : evaluation.feasibility.status ===
+                                          "good"
+                                        ? "score-good"
+                                        : "score-poor"
+                                    }" 
+                                         style="width: ${
+                                           evaluation.feasibility.score
+                                         }%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Sustainability / Life Support -->
+                            <div class="p-4 border rounded-lg">
+                                <h4 class="font-semibold text-lg mb-2">Sustainability & Life Support</h4>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm">Essential systems: ${
+                                      evaluation.sustainability.includedModules
+                                    }/${
+          evaluation.sustainability.totalEssential
+        }</span>
+                                    <span class="font-bold ${
+                                      evaluation.sustainability.status ===
+                                      "excellent"
+                                        ? "text-green-600"
+                                        : evaluation.sustainability.status ===
+                                          "good"
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    }">
+                                        ${evaluation.sustainability.score.toFixed(
+                                          1
+                                        )}%
+                                    </span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full ${
+                                      evaluation.sustainability.status ===
+                                      "excellent"
+                                        ? "score-excellent"
+                                        : evaluation.sustainability.status ===
+                                          "good"
+                                        ? "score-good"
+                                        : "score-poor"
+                                    }" 
+                                         style="width: ${
+                                           evaluation.sustainability.score
+                                         }%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Improvement Suggestions -->
+                        ${
+                          evaluation.suggestions.length > 0
+                            ? `
+                        <div class="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <h4 class="font-bold text-yellow-800 mb-3">Recommended Improvements</h4>
+                            <ul class="space-y-2 text-yellow-700">
+                                ${evaluation.suggestions
+                                  .map(
+                                    (suggestion) => `
+                                    <li class="flex items-start">
+                                        <svg class="w-4 h-4 mr-2 mt-0.5 text-yellow-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                        </svg>
+                                        ${suggestion}
+                                    </li>
+                                `
+                                  )
+                                  .join("")}
+                            </ul>
+                        </div>
+                        `
+                            : ""
+                        }
+
+                        <!-- Deployment Warning -->
+                        <div class="p-6 ${
+                          evaluation.overall.status === "excellent"
+                            ? "bg-green-50 border-green-200"
+                            : evaluation.overall.status === "good"
+                            ? "bg-yellow-50 border-yellow-200"
+                            : "bg-red-50 border-red-200"
+                        } rounded-lg border">
+                            <p class="font-bold ${
+                              evaluation.overall.status === "excellent"
+                                ? "text-green-700"
+                                : evaluation.overall.status === "good"
+                                ? "text-yellow-700"
+                                : "text-red-700"
+                            }">
+                                ${
+                                  evaluation.overall.status === "excellent"
+                                    ? "✓ Mission Ready: Your habitat meets NASA standards!"
+                                    : evaluation.overall.status === "good"
+                                    ? "⚠️ Mission Conditionally Approved: Consider improvements before deployment."
+                                    : "✗ Mission Not Ready: Significant improvements required before deployment."
+                                }
+                            </p>
+                            <p class="text-sm ${
+                              evaluation.overall.status === "excellent"
+                                ? "text-green-600"
+                                : evaluation.overall.status === "good"
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            } mt-2">
+                                ${
+                                  evaluation.overall.status === "excellent"
+                                    ? "Your habitat design is optimal for crew safety and mission success."
+                                    : evaluation.overall.status === "good"
+                                    ? "Your habitat is functional but could be improved for better crew comfort and efficiency."
+                                    : "Your current design does not meet minimum safety and habitability standards."
+                                }
+                            </p>
+                        </div>
+
+                        <div class="flex justify-between pt-4 border-t">
+                            <button onclick="goToPage('furniture')" class="px-4 py-2 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-150">
+                                &larr; Back to Selection
+                            </button>
+                            <button id="confirm-deployment-btn" class="px-8 py-3 ${
+                              evaluation.overall.status === "poor"
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : "bg-green-600 hover:bg-green-700"
+                            } text-white font-bold rounded-md transition duration-150 shadow-xl transform hover:scale-[1.03]" ${
+          evaluation.overall.status === "poor" ? "disabled" : ""
+        }>
+                                ${
+                                  evaluation.overall.status === "poor"
+                                    ? "Improve Design First"
+                                    : "CONFIRM DEPLOYMENT"
+                                }
+                            </button>
+                        </div>
+                    </div>
+                `;
+      }
+
+      // --- UI INTERACTION LOGIC ---
+
+      function attachPageListeners(page) {
+        const container = document.getElementById("config-container");
+
+        if (page === "habitats") {
+          container.querySelectorAll(".select-btn").forEach((btn) => {
+            btn.onclick = (e) => handleHabitatSelection(e.target.dataset.id);
+          });
+          container.querySelectorAll(".details-btn").forEach((btn) => {
+            btn.onclick = (e) =>
+              showDetailsPanel(e.target.dataset.id, "habitat");
+          });
+
+          // Initialize previews for habitats
+          HABITAT_CONFIG.forEach((habitat) => {
+            const containerId = `preview-habitat-${habitat.id}`;
+            createPreviewScene(habitat, containerId);
+          });
+        } else if (page === "furniture") {
+          container.querySelectorAll(".counter-btn").forEach((btn) => {
+            btn.onclick = (e) =>
+              handleFurnitureCounter(
+                e.target.dataset.id,
+                e.target.dataset.action
+              );
+          });
+          container.querySelectorAll(".details-btn").forEach((btn) => {
+            btn.onclick = (e) =>
+              showDetailsPanel(e.target.dataset.id, "furniture");
+          });
+
+          // Initialize previews for furniture
+          FURNITURE_CONFIG.forEach((furniture) => {
+            const containerId = `preview-furniture-${furniture.id}`;
+            createPreviewScene(furniture, containerId);
+          });
+        } else if (page === "evaluate") {
+          document.getElementById("confirm-deployment-btn").onclick =
+            deployModels;
+        }
+      }
+
+      function handleHabitatSelection(id) {
+        const habitat = HABITAT_CONFIG.find((h) => h.id === id);
+        configState.selectedHabitat = habitat;
+        renderCurrentPage(); // Re-render to update UI state
+      }
+
+      function handleFurnitureCounter(id, action) {
+        const currentCount = configState.selectedFurniture.get(id) || 0;
+
+        if (action === "increase") {
+          configState.selectedFurniture.set(id, currentCount + 1);
+        } else if (action === "decrease" && currentCount > 0) {
+          configState.selectedFurniture.set(id, currentCount - 1);
+        }
+
+        renderCurrentPage(); // Re-render to update UI state
+      }
+
+      function showDetailsPanel(id, type) {
+        const panelId =
+          type === "habitat"
+            ? "habitat-details-panel"
+            : "furniture-details-panel";
+        const panel = document.getElementById(panelId);
+        const config =
+          type === "habitat"
+            ? HABITAT_CONFIG.find((h) => h.id === id)
+            : FURNITURE_CONFIG.find((f) => f.id === id);
+
+        if (panel.dataset.currentId === id) {
+          // Hide if clicking the same button
+          panel.classList.add("hidden", "opacity-0", "translate-y-4");
+          panel.dataset.currentId = null;
+        } else {
+          // Convert radians to degrees for display
+          const rotationDegrees = ((config.rotation.y * 180) / Math.PI).toFixed(
+            1
+          );
+
+          panel.innerHTML = `
+                        <h4 class="font-bold text-lg">${
+                          config.name
+                        } Details</h4>
+                        <p class="text-sm">${config.details}</p>
+                        <p class="text-xs mt-2 text-gray-500">Model URL: <a href="${
+                          config.url
+                        }" target="_blank" class="underline">${config.url.substring(
+            0,
+            40
+          )}...</a></p>
+                        <p class="text-xs mt-1 text-gray-500">Scale: ${
+                          config.scale.x
+                        }, ${config.scale.y}, ${config.scale.z}</p>
+                        <p class="text-xs mt-1 text-gray-500">Position: ${
+                          config.position.x
+                        }, ${config.position.y}, ${config.position.z}</p>
+                        <p class="text-xs mt-1 text-gray-500">Rotation: ${rotationDegrees}° (Y-axis)</p>
+                    `;
+          panel.dataset.currentId = id;
+          panel.classList.remove("hidden", "opacity-0", "translate-y-4");
+        }
+      }
+
+      // --- 3D DEPLOYMENT LOGIC ---
+
+      function deployModels() {
+        hideConfigUI();
+
+        // Clear previously spawned objects
+        spawnedObjects.forEach((obj) => scene.remove(obj.mesh));
+        spawnedObjects.length = 0;
+        deselectObject(); // Ensure nothing is selected
+
+        const habitat = configState.selectedHabitat;
+
+        // Create deployment list with multiple instances of furniture
+        const deploymentList = [habitat];
+
+        // Add furniture with quantities
+        configState.selectedFurniture.forEach((count, id) => {
+          if (count > 0) {
+            const furniture = FURNITURE_CONFIG.find((f) => f.id === id);
+            for (let i = 0; i < count; i++) {
+              deploymentList.push(furniture);
+            }
+          }
+        });
+
+        // Track furniture instances for positioning
+        const furnitureInstances = {};
+
+        deploymentList.forEach((item, index) => {
+          loader.load(
+            item.url,
+            (gltf) => {
+              const model = gltf.scene;
+              model.traverse((node) => {
+                if (node.isMesh) {
+                  //   node.castShadow = true;
+                  //   node.receiveShadow = true;
+                }
+              });
+
+              model.name =
+                item.name +
+                (index === 0 ? " (HABITAT)" : ` (FURNITURE ${index})`);
+
+              // SEPARATE SCALING FOR HABITATS VS FURNITURE
+              // Use the scale defined in the configuration
+              model.scale.set(item.scale.x, item.scale.y, item.scale.z);
+
+              // SEPARATE ROTATION FOR HABITATS VS FURNITURE
+              // Apply Y-axis rotation from configuration
+              model.rotation.y = item.rotation.y;
+
+              // SEPARATE POSITIONING FOR HABITATS VS FURNITURE
+              if (index === 0) {
+                // This is the habitat (first item)
+                model.position.set(
+                  item.position.x,
+                  item.position.y,
+                  item.position.z
+                );
+              } else {
+                // This is furniture - handle multiple instances
+                if (!furnitureInstances[item.id]) {
+                  furnitureInstances[item.id] = 0;
+                }
+
+                // Calculate position for this furniture instance
+                const instanceCount = furnitureInstances[item.id];
+                const basePosition = item.position;
+
+                // Offset multiple instances of the same furniture type
+                const xOffset = instanceCount * 5; // Space out multiple instances
+                model.position.set(
+                  basePosition.x + xOffset,
+                  basePosition.y,
+                  basePosition.z
+                );
+
+                furnitureInstances[item.id]++;
+              }
+
+              scene.add(model);
+              spawnedObjects.push({ mesh: model, config: item });
+
+              // Convert radians to degrees for logging
+              const rotationDegrees = (
+                (item.rotation.y * 180) /
+                Math.PI
+              ).toFixed(1);
+
+              console.log(
+                `Deployed model: ${item.name} with scale: ${item.scale.x}, ${item.scale.y}, ${item.scale.z} at position: ${model.position.x}, ${model.position.y}, ${model.position.z} with rotation: ${rotationDegrees}°`
+              );
+            },
+            (xhr) => {
+              // Optional: show loading progress
+              console.log(
+                (xhr.loaded / xhr.total) * 100 + "% loaded: " + item.name
+              );
+            },
+            (error) => {
+              console.error(
+                `An error occurred loading model: ${item.name} (${item.url})`,
+                error
+              );
+              // Fallback: spawn a simple red box to represent the failed load
+              const fallbackMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(5, 5, 5),
+                new THREE.MeshLambertMaterial({ color: 0xcc0000 })
+              );
+
+              fallbackMesh.name = item.name + " (FAILED LOAD)";
+
+              // Apply separate scaling, rotation, and positioning to fallback meshes too
+              fallbackMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              fallbackMesh.rotation.y = item.rotation.y;
+
+              if (index === 0) {
+                // Habitat
+                fallbackMesh.position.set(
+                  item.position.x,
+                  item.position.y + 2.5, // Offset for visibility
+                  item.position.z
+                );
+              } else {
+                // Furniture
+                if (!furnitureInstances[item.id]) {
+                  furnitureInstances[item.id] = 0;
+                }
+
+                const instanceCount = furnitureInstances[item.id];
+                const basePosition = item.position;
+                const xOffset = instanceCount * 5;
+
+                fallbackMesh.position.set(
+                  basePosition.x + xOffset,
+                  basePosition.y + 2.5, // Offset for visibility
+                  basePosition.z
+                );
+
+                furnitureInstances[item.id]++;
+              }
+
+              scene.add(fallbackMesh);
+              spawnedObjects.push({ mesh: fallbackMesh, config: item });
+            }
+          );
+        });
+      }
+
+      // --- INITIALIZATION ON LOAD ---
+
+      window.onload = function () {
+        init3D();
+        setupStartScreen(); // New: setup the start screen to handle PointerLock initialization
+      };
+    </script>
+  </body>
+</html>

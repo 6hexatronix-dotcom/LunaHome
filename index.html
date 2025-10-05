@@ -180,7 +180,7 @@
       // --- CORE CONFIGURATION AND MODEL URLS (EDIT THIS SECTION) ---
       const MODEL_URLS = {
         // Placeholder URLs for GLB models. REPLACE these with your actual model paths.
-        HABITAT_1: "3d/Habitat Type 1 try 1 with window & door space .glb", // Example
+        HABITAT_1: "3d/Habitat Type 1 FINALLY DONE  .glb", // Example
         HABITAT_2: "3d/Puzzle habitat try 1 finally the final one .glb", // Example
         HABITAT_3: "3d/2ND H try 2 Smooth .glb", // Example
 
@@ -198,6 +198,166 @@
         // Add table and device URLs
         TABLE: "3d/matte_black_pub_table.glb", // Table model
         DEVICE: "3d/device_model.glb", // Device model - replace with your actual device model
+      };
+
+      // Habitat-specific furniture configurations
+      const HABITAT_FURNITURE_CONFIG = {
+        HABITAT_1: {
+          FURNITURE_1: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: -15.5, y: 25.1, z: -89 },
+            rotation: { y: 1.37 },
+          },
+          FURNITURE_2: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: 3, y: 25.1, z: -100.5 },
+            rotation: { y: -4.88 },
+          },
+          FURNITURE_3: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: -12.5, y: 12.1, z: -87 },
+            rotation: { y: 3.11 },
+          },
+          FURNITURE_4: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: 11.5, y: 25.6, z: -81.5 },
+            rotation: { y: 2.72 },
+          },
+          FURNITURE_5: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: -7, y: 38, z: -101.5 },
+            rotation: { y: -1.05 },
+          },
+          FURNITURE_6: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: -11, y: 38, z: -82 },
+            rotation: { y: 2.16 },
+          },
+          FURNITURE_7: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: 5, y: 38, z: -82 },
+            rotation: { y: -4.06 },
+          },
+          FURNITURE_8: {
+            scale: { x: 4, y: 4, z: 4 },
+            position: { x: 0.5, y: 12.5, z: -104 },
+            rotation: { y: 0.03 },
+          },
+          FURNITURE_9: {
+            scale: { x: 1, y: 1, z: 1 },
+            position: { x: 13.5, y: 14, z: -82.5 },
+            rotation: { y: 1.11 },
+          },
+          FURNITURE_10: {
+            scale: { x: 0.03, y: 0.03, z: 0.03 },
+            position: { x: 16, y: 12.1, z: -95.5 },
+            rotation: { y: -1.37 },
+          },
+        },
+        HABITAT_2: {
+          FURNITURE_1: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: -15.5, y: 0.1, z: -102 },
+            rotation: { y: 1.57 },
+          },
+          FURNITURE_2: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: -7, y: 18, z: -95 },
+            rotation: { y: -4.75 },
+          },
+          FURNITURE_3: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: -14, y: 0.1, z: -77.5 },
+            rotation: { y: 3.14 },
+          },
+          FURNITURE_4: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: 10, y: 18.5, z: -100 },
+            rotation: { y: -2.16 },
+          },
+          FURNITURE_5: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: 14.5, y: 0.1, z: -104.5 },
+            rotation: { y: -2.26 },
+          },
+          FURNITURE_6: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: 8.5, y: 18, z: -81 },
+            rotation: { y: 0 },
+          },
+          FURNITURE_7: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: 11.5, y: 0.1, z: -77.5 },
+            rotation: { y: -3.14 },
+          },
+          FURNITURE_8: {
+            scale: { x: 3.5, y: 3.5, z: 3.5 },
+            position: { x: 1, y: 0.1, z: -107 },
+            rotation: { y: 0.03 },
+          },
+          FURNITURE_9: {
+            scale: { x: 1.1, y: 1.1, z: 1.1 },
+            position: { x: -9.5, y: 20, z: -80 },
+            rotation: { y: -1.57 },
+          },
+          FURNITURE_10: {
+            scale: { x: 0.035, y: 0.035, z: 0.035 },
+            position: { x: -18, y: 0.1, z: -88.5 },
+            rotation: { y: -4.78 },
+          },
+        },
+        HABITAT_3: {
+          FURNITURE_1: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: -38, y: 0.1, z: -92 },
+            rotation: { y: -0.03 },
+          },
+          FURNITURE_2: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: 0, y: 12.6, z: -120 },
+            rotation: { y: -6.32 },
+          },
+          FURNITURE_3: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: -33, y: 0.1, z: -101.5 },
+            rotation: { y: 2.79 },
+          },
+          FURNITURE_4: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: 26, y: 12.6, z: -68.5 },
+            rotation: { y: 2.44 },
+          },
+          FURNITURE_5: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: 5.5, y: 0.1, z: -122.5 },
+            rotation: { y: -0.06 },
+          },
+          FURNITURE_6: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: 31, y: 0.1, z: -78.5 },
+            rotation: { y: -3.48 },
+          },
+          FURNITURE_7: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: -24.5, y: 0.1, z: -116.5 },
+            rotation: { y: 0.75 },
+          },
+          FURNITURE_8: {
+            scale: { x: 4.5, y: 4.5, z: 4.5 },
+            position: { x: -33, y: 0.1, z: -77 },
+            rotation: { y: -5.92 },
+          },
+          FURNITURE_9: {
+            scale: { x: 0.9, y: 0.9, z: 0.9 },
+            position: { x: 35.5, y: 1.6, z: -93.0 },
+            rotation: { y: 1.7 },
+          },
+          FURNITURE_10: {
+            scale: { x: 0.025, y: 0.025, z: 0.025 },
+            position: { x: 2, y: 0.1, z: -91.5 },
+            rotation: { y: -1.57 },
+          },
+        },
       };
 
       const HABITAT_CONFIG = [
@@ -228,7 +388,7 @@ Benefits: <br>
 - Protects against lunar radiation`,
           scale: { x: 5, y: 5, z: 5 }, // Habitat-specific scale
           position: { x: 0, y: 25, z: -90 }, // Habitat-specific position
-          rotation: { y: -Math.PI }, // Habitat-specific Y-axis rotation (in radians)
+          rotation: { y: -3.44 }, // Habitat-specific Y-axis rotation (in radians)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: 0, z: 0 }, // Position for preview
           // Evaluation properties
@@ -263,8 +423,8 @@ Benefits: <br>
 - Multi-functional for science, health, and leisure <br>
             `,
           scale: { x: 5, y: 5, z: 5 }, // Habitat-specific scale
-          position: { x: 0, y: 0, z: -90 }, // Habitat-specific position
-          rotation: { y: -1.37 }, // Habitat-specific Y-axis rotation (45 degrees)
+          position: { x: 0, y: 0.1, z: -90 }, // Habitat-specific position
+          rotation: { y: -1.57 }, // Habitat-specific Y-axis rotation (45 degrees)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -324,9 +484,9 @@ Benefits: <br>
 - Helps regulate circadian rhythm (light and sound isolation). <br>
 - Each is sized for one astronaut. 
           `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: -15.5, y: 25.1, z: -89 }, // Furniture-specific position
-          rotation: { y: 1.37 }, // Furniture-specific Y-axis rotation
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: -15.5, y: 25.1, z: -89 }, // Default position
+          rotation: { y: 1.37 }, // Default Y-axis rotation
           previewScale: 0.5, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -346,9 +506,9 @@ Benefits: <br>
 - Larger open volume reduces the feeling of confinement, improving mental health. <br>
 - Multi-functional: can hold galley, dining table, exercise gear, or command consoles. <br>
 - In emergencies, can be sealed and act as a safe-haven.`,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: 3, y: 25.1, z: -100.5 }, // Furniture-specific position
-          rotation: { y: -4.88 }, // Furniture-specific Y-axis rotation (30 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: 3, y: 25.1, z: -100.5 }, // Default position
+          rotation: { y: -4.88 }, // Default Y-axis rotation (30 degrees)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
           // Evaluation properties
@@ -370,9 +530,9 @@ Benefits: <br>
 - Keeps potentially hazardous work away from sleeping/social zones.<br>
 - Can double as a maintenance workshop for repairing equipment.<br>
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: -12.5, y: 12.1, z: -87 }, // Furniture-specific position
-          rotation: { y: 3.11 }, // Furniture-specific Y-axis rotation (60 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: -12.5, y: 12.1, z: -87 }, // Default position
+          rotation: { y: 3.11 }, // Default Y-axis rotation (60 degrees)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -393,9 +553,9 @@ Benefits: <br>
 - A full module with recycling systems reduces water consumption on long missions. <br>
 - Placing it near airlocks helps with dust and contamination control on Moon/Mars. <br>
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: 11.5, y: 25.6, z: -81.5 }, // Furniture-specific position
-          rotation: { y: 2.72 }, // Furniture-specific Y-axis rotation (-30 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: 11.5, y: 25.6, z: -81.5 }, // Default position
+          rotation: { y: 2.72 }, // Default Y-axis rotation (-30 degrees)
           previewScale: 0.5, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -417,9 +577,9 @@ Benefits: <br>
 - Keeps clutter out of crew living areas, improving workflow. <br>
 - Can be used as ballast to balance modules.
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: -7, y: 38, z: -101.5 }, // Furniture-specific position
-          rotation: { y: -1.05 }, // Furniture-specific Y-axis rotation (-60 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: -7, y: 38, z: -101.5 }, // Default position
+          rotation: { y: -1.05 }, // Default Y-axis rotation (-60 degrees)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -440,9 +600,9 @@ Benefits: <br>
 - Critical for safety and mission operations. <br>
 
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: -11, y: 38, z: -82 }, // Furniture-specific position
-          rotation: { y: 2.16 }, // Furniture-specific Y-axis rotation (180 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: -11, y: 38, z: -82 }, // Default position
+          rotation: { y: 2.16 }, // Default Y-axis rotation (180 degrees)
           previewScale: 0.5, // Scale for preview
           previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
           // Evaluation properties
@@ -464,9 +624,9 @@ Benefits: <br>
 - Judges will see it as critical for Mars outposts.
 
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: 5, y: 38, z: -82 }, // Furniture-specific position
-          rotation: { y: -4.06 }, // Furniture-specific Y-axis rotation (15 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: 5, y: 38, z: -82 }, // Default position
+          rotation: { y: -4.06 }, // Default Y-axis rotation (15 degrees)
           previewScale: 0.3, // Scale for preview
           previewPosition: { x: 0, y: -1, z: 0 }, // Position for preview
           // Evaluation properties
@@ -487,9 +647,9 @@ Benefits: <br>
 - Green spaces greatly improve psychological well-being (reduce stress, isolation). <br>
 - Long-term sustainability — vital for Mars outposts (less resupply needed).
         `,
-          scale: { x: 4, y: 4, z: 4 }, // Furniture-specific scale
-          position: { x: 0.5, y: 12.5, z: -104 }, // Furniture-specific position
-          rotation: { y: 0.03 }, // Furniture-specific Y-axis rotation (-15 degrees)
+          scale: { x: 4, y: 4, z: 4 }, // Default scale
+          position: { x: 0.5, y: 12.5, z: -104 }, // Default position
+          rotation: { y: 0.03 }, // Default Y-axis rotation (-15 degrees)
           previewScale: 1, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -513,9 +673,9 @@ Benefits: <br>
 - Designed with redundancy (N+1) so if one pump fails, backup takes over. <br>
 - Without this, the habitat cannot sustain life — it's the heart of the habitat.
             `,
-          scale: { x: 1, y: 1, z: 1 }, // Furniture-specific scale
-          position: { x: 13.5, y: 14, z: -82.5 }, // Furniture-specific position
-          rotation: { y: 1.11 }, // Furniture-specific Y-axis rotation (120 degrees)
+          scale: { x: 1, y: 1, z: 1 }, // Default scale
+          position: { x: 13.5, y: 14, z: -82.5 }, // Default position
+          rotation: { y: 1.11 }, // Default Y-axis rotation (120 degrees)
           previewScale: 0.5, // Scale for preview
           previewPosition: { x: 0, y: 0, z: 0 }, // Position for preview
           // Evaluation properties
@@ -537,9 +697,9 @@ Benefits: <br>
             - Reduces reliance on stored oxygen supplies, enhancing sustainability. <br>
             - Contributes to a closed-loop life support system.
             `,
-          scale: { x: 0.03, y: 0.03, z: 0.03 },
-          position: { x: 16, y: 12.1, z: -95.5 }, // Furniture-specific position
-          rotation: { y: -1.37 }, // Furniture-specific Y-axis rotation (-120
+          scale: { x: 0.03, y: 0.03, z: 0.03 }, // Default scale
+          position: { x: 16, y: 12.1, z: -95.5 }, // Default position
+          rotation: { y: -1.37 }, // Default Y-axis rotation (-120
           previewScale: 0.1, // Scale for preview
           previewPosition: { x: 0, y: -0.9, z: 0 }, // Position for preview
           // Evaluation properties
@@ -1321,18 +1481,36 @@ Benefits: <br>
         const previewData = previewScenes.get(itemId);
         if (!previewData) return;
 
-        // Rotate model slowly for better visualization
-        if (previewData.model) {
-          previewData.model.rotation.y += 0.01;
+        // Cancel any existing animation frame for this item
+        if (previewData.animationFrameId) {
+          cancelAnimationFrame(previewData.animationFrameId);
         }
 
-        previewData.renderer.render(previewData.scene, previewData.camera);
-        requestAnimationFrame(() => animatePreview(itemId));
+        function animate() {
+          const currentPreviewData = previewScenes.get(itemId);
+          if (!currentPreviewData) return;
+
+          // Rotate model slowly for better visualization
+          if (currentPreviewData.model) {
+            currentPreviewData.model.rotation.y += 0.01;
+          }
+
+          currentPreviewData.renderer.render(
+            currentPreviewData.scene,
+            currentPreviewData.camera
+          );
+          currentPreviewData.animationFrameId = requestAnimationFrame(animate);
+        }
+
+        previewData.animationFrameId = requestAnimationFrame(animate);
       }
 
       function cleanupPreviews() {
         // Clean up all preview scenes when leaving configuration UI
         previewScenes.forEach((previewData, itemId) => {
+          if (previewData.animationFrameId) {
+            cancelAnimationFrame(previewData.animationFrameId);
+          }
           if (previewData.renderer) {
             previewData.renderer.dispose();
           }
@@ -2481,13 +2659,45 @@ Benefits: <br>
                 item.name +
                 (index === 0 ? " (HABITAT)" : ` (FURNITURE ${index})`);
 
+              // Get habitat-specific furniture configuration if available
+              let furnitureConfig = null;
+              if (
+                index > 0 &&
+                habitat &&
+                HABITAT_FURNITURE_CONFIG[habitat.id]
+              ) {
+                furnitureConfig = HABITAT_FURNITURE_CONFIG[habitat.id][item.id];
+              }
+
               // SEPARATE SCALING FOR HABITATS VS FURNITURE
-              // Use the scale defined in the configuration
-              model.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              if (index === 0) {
+                // This is the habitat (first item)
+                model.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              } else {
+                // This is furniture - use habitat-specific config if available, otherwise use default
+                if (furnitureConfig) {
+                  model.scale.set(
+                    furnitureConfig.scale.x,
+                    furnitureConfig.scale.y,
+                    furnitureConfig.scale.z
+                  );
+                } else {
+                  model.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                }
+              }
 
               // SEPARATE ROTATION FOR HABITATS VS FURNITURE
-              // Apply Y-axis rotation from configuration
-              model.rotation.y = item.rotation.y;
+              if (index === 0) {
+                // This is the habitat (first item)
+                model.rotation.y = item.rotation.y;
+              } else {
+                // This is furniture - use habitat-specific config if available, otherwise use default
+                if (furnitureConfig) {
+                  model.rotation.y = furnitureConfig.rotation.y;
+                } else {
+                  model.rotation.y = item.rotation.y;
+                }
+              }
 
               // SEPARATE POSITIONING FOR HABITATS VS FURNITURE
               if (index === 0) {
@@ -2505,7 +2715,14 @@ Benefits: <br>
 
                 // Calculate position for this furniture instance
                 const instanceCount = furnitureInstances[item.id];
-                const basePosition = item.position;
+
+                // Use habitat-specific position if available, otherwise use default
+                let basePosition;
+                if (furnitureConfig) {
+                  basePosition = furnitureConfig.position;
+                } else {
+                  basePosition = item.position;
+                }
 
                 // Offset multiple instances of the same furniture type
                 const xOffset = instanceCount * 5; // Space out multiple instances
@@ -2528,7 +2745,7 @@ Benefits: <br>
               ).toFixed(1);
 
               console.log(
-                `Deployed model: ${item.name} with scale: ${item.scale.x}, ${item.scale.y}, ${item.scale.z} at position: ${model.position.x}, ${model.position.y}, ${model.position.z} with rotation: ${rotationDegrees}°`
+                `Deployed model: ${item.name} with scale: ${model.scale.x}, ${model.scale.y}, ${model.scale.z} at position: ${model.position.x}, ${model.position.y}, ${model.position.z} with rotation: ${rotationDegrees}°`
               );
             },
             (xhr) => {
